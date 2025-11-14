@@ -18,26 +18,24 @@
         body {
             background-color: #FFFFFF;
             color: #0A0A0A;
-            font-family: 'Inter', sans-serif; /* Set default font */
+            font-family: 'Inter', sans-serif;
         }
-        /* Import Playfair Display for headings */
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&display=swap');
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- **CRITICAL:** The script block must have type="text/babel" to run JSX -->
+    <!-- The script MUST be type="text/babel" to compile the JSX -->
     <script type="text/babel">
     
-    // --- Design Tokens and Core Helpers ---
     const DESIGN = {
       PRIMARY_NOIR: "#0A0A0A", LUXURY_ACCENT: "#D4A373", HIGHLIGHT_PLUM: "#5E2A5E", GLOW_FUCHSIA: "#C2185B", 
       SURFACE_CARD: "#FFFFFF", BACKGROUND: "#FFFFFF", MUTED_TEXT: "#4A4A4A", BORDER: "#E6E0EB",
       SUCCESS: "#52C57B", ERROR: "#E75468", ROUNDING_CARD: "rounded-[18px]", ROUNDING_BUTTON: "rounded-[28px]",
       PRIMARY_CTA_GRADIENT: "bg-gradient-to-r from-[#5E2A5E] via-[#C2185B] to-[#D4A373]",
     };
-    
+
     const LS_KEYS = {
       PROFILE: "gm_profile", REVIEWS: "gm_reviews", VOTES: "gm_votes", ROUTINE: "gm_routine",
       SAVED: "gm_saved", COMMENTS: "gm_comments", FOLLOWING: "gm_following",
@@ -62,7 +60,7 @@
 
     const getProduct = (id) => PRODUCTS.find(p => p.id === id);
 
-    // --- Product Data (Truncated for readability, full data in application logic) ---
+    // --- Product Data (Simplified for space) ---
     const CATEGORIES = ["cleanser","moisturizer","sunscreen","serum","foundation","lipstick","kajal","blush","primer"];
     const PRODUCTS = [
       {id:"p_min_spf", brand:"Minimalist", name:"SPF 50 PA++++ Sunscreen Gel", category:"sunscreen", priceMin:399, priceMax:599, tags:["gel","no white cast"], ingredients:["UV filters","niacinamide"], for:["oily","combination","normal"], availability:true},
@@ -85,7 +83,7 @@
         { id: 'r_002', productId: 'p_lor_uvd', rating: 5, text: "Worth the splurge! My skin stays hydrated all day, perfect for my dry skin. Holy grail product. Love it!", skinType: 'dry', anon: false, createdAt: new Date(Date.now() - 86400000 * 5).toISOString()},
     ];
     
-    // --- Remaining Logic Helpers ---
+    // --- Logic Helpers (Necessary minimum) ---
     function wilsonLowerBound(avg, n, z=1.96){ return n===0 ? 0 : (avg/5); }
     function decayFactor(weeksAgo){ return Math.pow(0.85, weeksAgo); }
     function weeksBetween(d1, d2){ return Math.floor(Math.abs(d1 - d2) / (1000*60*60*24*7)); }
@@ -98,17 +96,8 @@
         saveLS(LS_KEYS.VOTES, defaultVotes);
       }
       if (!localStorage.getItem(LS_KEYS.ROUTINE)) saveLS(LS_KEYS.ROUTINE, { am: [], pm: [], makeup: [] });
-      if (!localStorage.getItem(LS_KEYS.COMMENTS)) saveLS(LS_KEYS.COMMENTS, {});
       if (!localStorage.getItem(LS_KEYS.FOLLOWING)) saveLS(LS_KEYS.FOLLOWING, ["NYK-SHREYA-01"]);
-    }
-    
-    function checkRoutineConflicts(currentRoutine) {
-        const warnings = {am: [], pm: [], makeup: []};
-        // Simple mock conflict logic: no sunscreen in PM
-        if (currentRoutine.pm.some(i => getProduct(i.id)?.category === 'sunscreen')) {
-          warnings.pm.push('Sunscreen is unnecessary at night. Move it to your AM routine.');
-        }
-        return warnings;
+      if (!localStorage.getItem(LS_KEYS.COMMENTS)) saveLS(LS_KEYS.COMMENTS, {});
     }
 
     function communityScore(productId) {
@@ -122,14 +111,9 @@
       const wAvg = weighted.length ? weighted.reduce((a,b)=>a+b,0)/weighted.length : 0;
       return wilsonLowerBound(wAvg, n || 1);
     }
-    
+
     function fitScore(profile, product, category) {
       let score = 0;
-      const concerns = new Set(profile?.concerns || []);
-      const ing = (product.ingredients || []).map(x=>x.toLowerCase());
-      const has = (k)=> ing.some(i=>i.includes(k));
-
-      if (concerns.has("acne") && (has("niacinamide") || has("salicylic"))) score += 0.5;
       if (product.tags?.includes("fragrance-free") && profile.sensitive) score += 0.3;
       return Math.min(1, score);
     }
@@ -149,44 +133,24 @@
     const handleAIChat = ({userText, profile, getProduct, setCategory, allReviews, allCreators, allRoutine}) => {
         const text = userText.toLowerCase().trim();
         const categories = CATEGORIES.join('|');
-        const ingredients = ['niacinamide', 'salicylic acid', 'vitamin c', 'aha', 'bha', 'retinol'];
-        
-        // 1. Routine Building & Safety Check
-        if (/(build|suggest|create|routine)/.test(text)) {
+        let reply = null;
+
+        if (/(build|suggest|routine)/.test(text)) {
             const slots = ['am', 'pm', 'makeup'].filter(s => text.includes(s));
             const slot = slots.length ? slots[0] : 'am';
-            const ranked = rankProducts({profile, category: 'cleanser'}).slice(0, 1)
-                .concat(rankProducts({profile, category: 'moisturizer'}).slice(0, 1));
+            const ranked = rankProducts({profile, category: 'cleanser'}).slice(0, 1);
             
-            let routineSteps = ranked.filter(p => p.category !== 'sunscreen' || slot === 'am')
-                .map(p => `• ${p.name} (${p.category}) - ${p.tags[0]}`);
+            let routineSteps = ranked.map(p => `• ${p.name} (${p.category})`);
 
-            return { role: 'assistant', text: `I've built a quick **${slot.toUpperCase()} routine** based on your needs. Check out the ${slot.toUpperCase()} section in "Routine"! \n\n**Steps suggested:**\n${routineSteps.join('\n')}` };
+            return { role: 'assistant', text: `I've built a quick **${slot.toUpperCase()} routine**. Steps:\n${routineSteps.join('\n')}` };
         }
-        
-        // 2. Ingredient Explanation
-        else if (new RegExp(`(${ingredients.join('|')})`).test(text) && /(what is|what does|explain)/.test(text)) {
-            const match = text.match(new RegExp(`(${ingredients.join('|')})`));
-            const ing = match ? match[1] : null;
-
-            if (ing === 'niacinamide') {
-                return { role: 'assistant', text: `**Niacinamide (Vitamin B3)** helps minimize enlarged pores, tighten skin, and improve barrier function. Should I find a niacinamide serum for you?` };
-            }
-        }
-        
-        // 3. General Recommendation Flow (Default)
-        else if (new RegExp(`(${categories.join('|')})`).test(text) || /(recommend|pick|best)/.test(text)) {
+        else if (/(recommend|pick|best)/.test(text)) {
             const catMatch = text.match(new RegExp(`(${categories.join('|')})`));
             const cat = catMatch ? catMatch[1] : profile.category || 'sunscreen';
-            
-            const ranked = rankProducts({profile, category: cat});
-            
-            return { role: 'assistant', text: `Based on your ${profile.skinType} skin and interest in **${cat}**, here are your top picks! Check the cards in the section below.` };
+            return { role: 'assistant', text: `Based on your ${profile.skinType} skin and interest in **${cat}**, here are your top picks! Check the cards below.` };
         } 
-        
-        // 4. Fallback
         else {
-            return { role: 'assistant', text: `I'm still learning! You can ask me to: **Recommend a cleanser**, **Explain Retinol**, or **Build a PM routine**!` };
+            return { role: 'assistant', text: `I'm still learning! You can ask me to: **Recommend a cleanser**, or **Build a PM routine**!` };
         }
     }
 
@@ -209,11 +173,9 @@
       return (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {/* H2 Typography: 26px, Playfair, Medium */}
             <h3 className={`text-[26px] font-medium text-[${DESIGN.PRIMARY_NOIR}] playfair-text`}>{title}</h3>
             {right}
           </div>
-          {/* Luxury Card Styling + Shadow + Rounding */}
           <div className={`bg-[${DESIGN.SURFACE_CARD}] ${DESIGN.ROUNDING_CARD} shadow-lg p-6 border ${DESIGN.BORDER}`}>{children}</div>
         </div>
       );
@@ -244,7 +206,7 @@
         const scoreText = (p.score * 100).toFixed(0);
         const brandLogo = getBrandLogo(p.brand);
 
-        const ButtonCTA = ({ label, slot, onClickHandler }) => (
+        const ButtonCTA = ({ label, onClickHandler }) => (
             <button
                 type="button"
                 onClick={onClickHandler}
@@ -304,7 +266,6 @@
         const currentDraft = commentDrafts[r.id] || "";
         const brandLogo = getBrandLogo(p?.brand || "G");
 
-        // Community Card Styling - White background
         return (
             <div className={`bg-white ${DESIGN.ROUNDING_CARD} p-5 mb-4 shadow-md border ${DESIGN.BORDER}`}>
                 <div className="flex items-start justify-between mb-2">
@@ -317,7 +278,6 @@
                     </div>
                 </div>
 
-                {/* Rating Stars (Aligned and Contained) */}
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
                     <div className="flex items-center gap-2">
                         <RatingStars rating={r.rating} />
@@ -447,8 +407,37 @@
         </div>
     );
 
+    function GuideCard({ title, icon, content, guideState, setGuideState }) {
+        const [isOpen, setIsOpen] = React.useState(guideState[title] || false);
+
+        const toggleOpen = () => {
+            setIsOpen(!isOpen);
+            setGuideState(prev => ({ ...prev, [title]: !isOpen }));
+        };
+
+        return (
+            <div className={`mb-4 border-b ${DESIGN.BORDER} last:border-b-0`}>
+                <button
+                    onClick={toggleOpen}
+                    className={`flex justify-between items-center w-full py-3 text-left font-medium text-[${DESIGN.PRIMARY_NOIR}] hover:text-[${DESIGN.HIGHLIGHT_PLUM}] transition-colors`}
+                >
+                    <span className="text-xl mr-2 text-[${DESIGN.HIGHLIGHT_PLUM}]">{icon}</span>
+                    <span className="flex-1 text-[16px]">{title}</span>
+                    <span className="text-2xl transform transition-transform duration-300 text-[${DESIGN.HIGHLIGHT_PLUM}]">
+                        {isOpen ? '−' : '+'}
+                    </span>
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 opacity-100 pb-3' : 'max-h-0 opacity-0'}`}>
+                    <ul className={`list-disc ml-8 text-[16px] text-[${DESIGN.MUTED_TEXT}] space-y-1`}>
+                        {content.map((item, i) => <li key={i}>{item}</li>)}
+                    </ul>
+                </div>
+            </div>
+        );
+    };
 
     export default function GlowMate(){
+      const { useEffect, useMemo, useState } = React;
       seedIfEmpty();
       const [tab, setTab] = useState("discover");
       const [profile, setProfile] = useState(()=>loadLS(LS_KEYS.PROFILE, {
@@ -468,7 +457,7 @@
       const [openComments, setOpenComments] = useState({});
       const [commentDrafts, setCommentDrafts] = useState({});
       const [newReview, setNewReview] = useState({productId: PRODUCTS[0].id, rating:5, text:"", skinType: profile.skinType, concerns: profile.concerns, anon:true});
-      const [following, setFollowing] = useState(()=>loadLS(LS_KEYS.FOLLOWING, []));
+      const [following, setFollowing] = useState(()=>loadLS(LS_KEYS.FOLLOWing, []));
       const [creatorIdInput, setCreatorIdInput] = useState("");
       const [lastSearchedId, setLastSearchedId] = useState("");
       const [guideState, setGuideState] = useState({});
@@ -661,7 +650,7 @@
                           <div className={`${m.role==='assistant' ? `bg-white border ${DESIGN.BORDER} text-[${DESIGN.PRIMARY_NOIR}]` : `bg-[${DESIGN.ACCENT}] text-white`} rounded-[16px] p-3 text-[16px] shadow-sm`}>{m.text}</div>
                         </div>
                       ))}
-                      {isTyping && (
+                      {input && isTyping && (
                           <div className="self-start max-w-[85%]">
                               <div className={`bg-white border ${DESIGN.BORDER} rounded-[16px] p-3 text-[16px] shadow-sm`}>
                                 <span className={`animate-pulse text-[${DESIGN.GLOW_FUCHSIA}]`}>...</span>
@@ -814,7 +803,7 @@
                         <button 
                             key={cat}
                             onClick={() => handleNavigation('community', { category: cat })}
-                            className={`mb-2 px-4 py-2 w-full text-left capitalize ${DESIGN.ROUNDING_CARD} bg-gray-50 hover:bg-gray-100 transition-colors text-[${DESIGN.PRIMARY_NOIR}]`}
+                            className={`mb-2 px-4 py-2 w-full text-left capitalize ${DESIGN.ROUNDING_BUTTON} bg-gray-50 hover:bg-gray-100 transition-colors text-[${DESIGN.PRIMARY_NOIR}]`}
                         >
                             {cat}
                         </button>

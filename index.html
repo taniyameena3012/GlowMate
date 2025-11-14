@@ -8,12 +8,12 @@
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Load React and Babel (Crucial for running JSX in the browser) -->
+    <!-- Load React and Babel (CRITICAL: Load order is essential) -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Custom Fonts and Base Styles (FIXED: Moved static styles here) -->
+    <!-- Custom Fonts and Base Styles -->
     <style>
         body {
             background-color: #FFFFFF;
@@ -26,8 +26,8 @@
 <body>
     <div id="root"></div>
 
-    <!-- The script MUST be type="text/babel" to compile the JSX -->
-    <script type="text/babel" data-type="module" data-presets="es2015,react" data-plugins="transform-modules-umd">
+    <!-- The script MUST be type="text/babel" -->
+    <script type="text/babel">
     
     const DESIGN = {
       PRIMARY_NOIR: "#0A0A0A", LUXURY_ACCENT: "#D4A373", HIGHLIGHT_PLUM: "#5E2A5E", GLOW_FUCHSIA: "#C2185B", 
@@ -87,10 +87,6 @@
     function wilsonLowerBound(avg, n, z=1.96){ return n===0 ? 0 : (avg/5); }
     function decayFactor(weeksAgo){ return Math.pow(0.85, weeksAgo); }
     function weeksBetween(d1, d2){ return Math.floor(Math.abs(d1 - d2) / (1000*60*60*24*7)); }
-
-    function getProduct(id) {
-        return PRODUCTS.find(p => p.id === id);
-    }
 
     function seedIfEmpty() {
       if (!localStorage.getItem(LS_KEYS.REVIEWS)) saveLS(LS_KEYS.REVIEWS, INITIAL_REVIEWS);
